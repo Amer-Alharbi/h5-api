@@ -1,16 +1,24 @@
+from fastapi import FastAPI, File, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
 import tensorflow as tf
-from flask import Flask, request, jsonify
-from flask_cors import CORS
 import numpy as np
 from PIL import Image
 import io
 
-app = Flask(__name__)
-CORS(app)
+app = FastAPI(
+    title="Heritage Classifier API",
+    description="API for predicting heritage landmarks using a TensorFlow (.h5) model.",
+    version="1.0.0"
+)
 
-# -----------------------------
-# LOAD MODEL & LABELS
-# -----------------------------
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
+
 model = tf.keras.models.load_model("model.h5")
 
 with open("labels.txt", "r") as f:
@@ -25,34 +33,23 @@ def preprocess_image(image_bytes):
     img = np.expand_dims(img, axis=0)
     return img
 
-# -----------------------------
-# API ROUTES
-# -----------------------------
-@app.route("/", methods=["GET"])
+@app.get("/")
 def home():
-    return jsonify({"message": "API is running"}), 200
+    return {"message": "API is running"}
 
-@app.route("/predict", methods=["POST"])
-def predict():
-    try:
-        if "image" not in request.files:
-            return jsonify({"error": "Please upload an image"}), 400
+@app.post("/predict")
+async def predict(image: UploadFile = File(...)):
+    image_bytes = await image.read()
+    img = preprocess_image(image_bytes)
 
-        image_file = request.files["image"]
-        img = preprocess_image(image_file.read())
+    predictions = model.predict(img)
+    idx = int(np.argmax(predictions[0]))
+    confidence = float(np.max(predictions[0]))
 
-        predictions = model.predict(img)
-        class_index = np.argmax(predictions[0])
-        confidence = float(np.max(predictions[0]))
-
-        return jsonify({
-            "prediction": labels[class_index],
-            "confidence": confidence
-        })
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
+    return {
+        "prediction": labels[idx],
+        "confidence": confidence
+    }
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    uvicorn.run(app, host="0.0.0.0", port=10000)
