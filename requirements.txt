@@ -1,6 +1,6 @@
-Flask
-Flask-Cors
+fastapi
+uvicorn
 tensorflow==2.20.0
 numpy
 Pillow
-gunicorn
+python-multipart
