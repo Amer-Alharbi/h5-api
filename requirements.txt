@@ -1,0 +1,6 @@
+Flask
+Flask-Cors
+tensorflow==2.15.0
+numpy
+Pillow
+gunicorn
